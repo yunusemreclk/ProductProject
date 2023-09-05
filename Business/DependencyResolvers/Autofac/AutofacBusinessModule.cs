@@ -22,6 +22,9 @@ namespace Business.DependencyResolvers.Autofac
             builder.RegisterType<ProductManager>().As<IProductService>();
             builder.RegisterType<EfProductDal>().As<IProductDal>();
 
+            builder.RegisterType<CategoryManager>().As<IProductService>();
+            builder.RegisterType<EfCategoryDal>().As<ICategoryDal>();
+
             var assembly = System.Reflection.Assembly.GetExecutingAssembly();
 
             builder.RegisterAssemblyTypes(assembly).AsImplementedInterfaces()

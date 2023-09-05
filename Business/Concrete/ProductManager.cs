@@ -3,6 +3,7 @@ using Business.Constants;
 using Business.ValidationRules.FluentValidation;
 using Core.Aspects.Autofac.Validation;
 using Core.CrossCuttingConcerns.Validation;
+using Core.Utilities.Business;
 using Core.Utilities.Results;
 using DataAccess.Abstract;
 using Entities.Concrete;
@@ -16,18 +17,20 @@ using System.Threading.Tasks;
 
 namespace Business.Concrete
 {
-   public class ProductManager : IProductService
+    public class ProductManager : IProductService
     {
-       private readonly IProductDal _productDal;
-
-        public ProductManager(IProductDal productDal)
+        private readonly IProductDal _productDal;
+        private readonly ICategoryService _categoryService;
+        public ProductManager(IProductDal productDal,ICategoryService categoryService)
         {
             _productDal = productDal;
+            _categoryService = categoryService;
         }
 
         [ValidationAspect(typeof(ProductValidator))]
         public IResult Add(Product product)
         {
+
             //Yöntem 1
             //var context =new  ValidationContext<Product>(product);
             //ProductValidator productValidator = new ProductValidator();
@@ -39,14 +42,25 @@ namespace Business.Concrete
 
             //Yöntem 2
             //ValidationTool.Validate(new ProductValidator(), product);
+            IResult result=BusinessRules.Run(
+                CheckIfProductCountOfCategoryCorrect(product.CategoryId), 
+                CheckIfProductNameExists(product.ProductName), 
+                CheckIfCategoryLimitExceded());
+
+            if (result!=null)
+            {
+                return result;
+            }
             _productDal.Add(product);
-            return new Result(true,"Ürün Eklendi");
+            return new SuccessResult(Messages.ProductAdded);
+
         }
+       
 
         public IResult Delete(Product product)
         {
             _productDal.Delete(product);
-            return new Result(true, "Ürün Eklendi");
+            return new SuccessResult(Messages.ProductAdded);
         }
 
         public IDataResult<List<Product>> GetAll()
@@ -79,7 +93,37 @@ namespace Business.Concrete
         public IResult Update(Product product)
         {
             _productDal.Update(product);
-            return new Result(true, "Ürün Eklendi");
+            return new SuccessResult(Messages.ProductUpdated);
         }
+        
+        private IResult CheckIfProductCountOfCategoryCorrect(int categoryId)
+        {
+            var result = _productDal.GetAll(p => p.CategoryId == categoryId).Count();
+            if (result>=15)
+            {
+                return new ErrorResult(Messages.ProductCountOfCategoryError);
+            }
+            return new SuccessResult();
+        }
+        private IResult CheckIfProductNameExists(string productName)
+        {
+            var result = _productDal.GetAll(p => p.ProductName == productName).Any();
+            if (result)
+            { 
+                return new ErrorResult(Messages.ProductNameAlreadyExists);
+               
+            } 
+           return new SuccessResult();
+        }
+        private IResult CheckIfCategoryLimitExceded()
+        {
+            var result = _categoryService.GetAll();
+            if (result.Data.Count>15)
+            {
+                return new ErrorResult(Messages.CategoryLimitedExceded);
+            }
+            return new SuccessResult();
+        }
+        
     }
 }
