@@ -2,7 +2,11 @@
 using Business.BusinessAspects.Autofac;
 using Business.Constants;
 using Business.ValidationRules.FluentValidation;
+using Core.Aspects.Autofac.Caching;
+using Core.Aspects.Autofac.Performance;
+using Core.Aspects.Autofac.Transaction;
 using Core.Aspects.Autofac.Validation;
+using Core.CrossCuttingConcerns.Caching;
 using Core.CrossCuttingConcerns.Validation;
 using Core.Utilities.Business;
 using Core.Utilities.Results;
@@ -15,6 +19,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Transactions;
 
 namespace Business.Concrete
 {
@@ -22,12 +27,13 @@ namespace Business.Concrete
     {
         private readonly IProductDal _productDal;
         private readonly ICategoryService _categoryService;
-        public ProductManager(IProductDal productDal,ICategoryService categoryService)
+      
+        public ProductManager(IProductDal productDal,ICategoryService categoryService )
         {
             _productDal = productDal;
             _categoryService = categoryService;
         }
-
+        [PerformanceAspect(5)]
         [ValidationAspect(typeof(ProductValidator))]
         [SecuredOperation("product.Add,admin")]
         public IResult Add(Product product)
@@ -57,14 +63,13 @@ namespace Business.Concrete
             return new SuccessResult(Messages.ProductAdded);
 
         }
-       
 
         public IResult Delete(Product product)
         {
             _productDal.Delete(product);
             return new SuccessResult(Messages.ProductAdded);
         }
-
+        [CacheAspect]
         public IDataResult<List<Product>> GetAll()
         {
             if (DateTime.Now.Hour==20)
@@ -73,6 +78,8 @@ namespace Business.Concrete
             }
             return new SuccessDataResult<List<Product>>(_productDal.GetAll(),Messages.ProductsListed);
         }
+        [CacheAspect]
+        [PerformanceAspect(5)]
         public IDataResult<Product> GetById(int id)
         {
             return new DataResult<Product>(_productDal.Get(x=>x.ProductId==id), true, "Ürünler listelendi");
@@ -126,6 +133,18 @@ namespace Business.Concrete
             }
             return new SuccessResult();
         }
-        
+        [TransactionScopeAspect]
+        public IResult AddTransactionalTest(Product product)
+        {
+          
+                    Add(product);
+                    if (product.UnitPrice<10)
+                    {
+                        throw new Exception("");
+                    }
+                    Add(product);
+
+            return null;
+        }
     }
 }
